@@ -47,6 +47,7 @@ var ipHeadersInOrder = []string{
 
 // Stolen from https://github.com/pbojinov/request-ip
 func grabIP(r *http.Request) string {
+	fmt.Println(":", r)
 	if ip := r.Header.Get("x-client-ip"); ip != "" {
 		fmt.Println("triggered: x-client-ip")
 		return ip
