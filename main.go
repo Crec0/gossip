@@ -22,7 +22,11 @@ func main() {
 }
 
 func serveIP(writer http.ResponseWriter, request *http.Request) {
-	ip := net.ParseIP(grabIP(request))
+	candidate := grabIP(request)
+	if strings.Contains(candidate, ":") {
+		candidate, _, _ = net.SplitHostPort(candidate)
+	}
+	ip := net.ParseIP(candidate)
 	if ip == nil {
 		writer.WriteHeader(400)
 		_, _ = fmt.Fprint(writer, "No ip found")
@@ -56,11 +60,7 @@ func grabIP(r *http.Request) string {
 	if ip := r.Header.Get("x-forwarded-for"); ip != "" {
 		candidates := strings.Split(ip, ",")
 		if len(candidates) > 0 {
-			candidate := strings.TrimSpace(candidates[0])
-			if strings.Contains(candidate, ":") {
-				candidate, _, _ = net.SplitHostPort(candidate)
-			}
-			ip = candidate
+			ip = strings.TrimSpace(candidates[0])
 		}
 		fmt.Println("triggered: x-forwarded-for")
 		return ip
