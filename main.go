@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net"
@@ -9,16 +10,23 @@ import (
 	"strings"
 )
 
+var isDebugEnabled = false
+var logger = log.Default()
+
 func main() {
 	portToServe, ok := os.LookupEnv("PORT")
 	if !ok {
 		portToServe = "10059"
 	}
 
-	fmt.Printf("Serving on %s\n", portToServe)
+	envDebugEnabled, ok := os.LookupEnv("PORT")
+	if ok {
+		isDebugEnabled = strings.ToLower(envDebugEnabled) == "true"
+	}
+	logger.Printf("Serving on %s\n", portToServe)
 
 	http.HandleFunc("/", serveIP)
-	log.Fatal(http.ListenAndServe(":"+portToServe, nil))
+	logger.Fatal(http.ListenAndServe(":"+portToServe, nil))
 }
 
 func serveIP(writer http.ResponseWriter, request *http.Request) {
@@ -51,9 +59,19 @@ var ipHeadersInOrder = []string{
 
 // Stolen from https://github.com/pbojinov/request-ip
 func grabIP(r *http.Request) string {
-	fmt.Println(":", r)
+
+	if isDebugEnabled {
+		marshalled, err := json.MarshalIndent(r, " ", "  ")
+		if err != nil {
+			log.Println("ERROR: failed to marshal request")
+		}
+		log.Println(string(marshalled))
+	}
+
 	if ip := r.Header.Get("x-client-ip"); ip != "" {
-		fmt.Println("triggered: x-client-ip")
+		if isDebugEnabled {
+			log.Println("DEBUG: x-client-ip")
+		}
 		return ip
 	}
 
@@ -62,17 +80,23 @@ func grabIP(r *http.Request) string {
 		if len(candidates) > 0 {
 			ip = strings.TrimSpace(candidates[0])
 		}
-		fmt.Println("triggered: x-forwarded-for")
+		if isDebugEnabled {
+			log.Println("DEBUG: x-forwarded-for")
+		}
 		return ip
 	}
 
 	for _, headerName := range ipHeadersInOrder {
 		if ip := r.Header.Get(headerName); ip != "" {
-			fmt.Println("triggered: " + headerName)
+			if isDebugEnabled {
+				log.Println("DEBUG: " + headerName)
+			}
 			return ip
 		}
 	}
 
-	fmt.Println("triggered: remote addr")
+	if isDebugEnabled {
+		log.Println("DEBUG: remote addr")
+	}
 	return r.RemoteAddr
 }
