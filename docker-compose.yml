@@ -6,5 +6,8 @@ services:
         container_name: ip-pls
         restart: always
 
+        env_file:
+            - ".env"
+
         ports:
             - '10059:10059'
