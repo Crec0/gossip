@@ -1,0 +1,10 @@
+version: '3'
+
+services:
+    ip-pls:
+        build: .
+        container_name: ip-pls
+        restart: always
+
+        ports:
+            - '10059:10059'
