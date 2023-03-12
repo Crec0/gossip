@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"log"
 	"net"
@@ -11,7 +10,7 @@ import (
 )
 
 func main() {
-	portToServe, ok := os.LookupEnv("PORT")
+	portToServe, ok := os.LookupEnv("IP_SERVICE_PORT")
 	if !ok {
 		portToServe = "10059"
 	}
@@ -49,12 +48,6 @@ var headersInOrder = []string{
 }
 
 func grabIP(r *http.Request) string {
-	marshalled, err := json.MarshalIndent(r, " ", "  ")
-	if err != nil {
-		log.Println("ERROR: failed to marshal request")
-	}
-	log.Println(string(marshalled))
-
 	if ip := r.Header.Get("x-forwarded-for"); ip != "" {
 		candidates := strings.Split(ip, ",")
 		if len(candidates) > 0 {
