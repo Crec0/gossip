@@ -10,23 +10,13 @@ import (
 	"strings"
 )
 
-var isDebugEnabled = false
-var logger = log.Default()
-
 func main() {
 	portToServe, ok := os.LookupEnv("PORT")
 	if !ok {
 		portToServe = "10059"
 	}
-
-	envDebugEnabled, ok := os.LookupEnv("PORT")
-	if ok {
-		isDebugEnabled = strings.ToLower(envDebugEnabled) == "true"
-	}
-	logger.Printf("Serving on %s\n", portToServe)
-
-	http.HandleFunc("/", serveIP)
-	logger.Fatal(http.ListenAndServe(":"+portToServe, nil))
+	log.Printf("Serving on %s\n", portToServe)
+	log.Fatal(http.ListenAndServe(":"+portToServe, http.HandlerFunc(serveIP)))
 }
 
 func serveIP(writer http.ResponseWriter, request *http.Request) {
@@ -35,6 +25,7 @@ func serveIP(writer http.ResponseWriter, request *http.Request) {
 		candidate, _, _ = net.SplitHostPort(candidate)
 	}
 	ip := net.ParseIP(candidate)
+
 	if ip == nil {
 		writer.WriteHeader(400)
 		_, _ = fmt.Fprint(writer, "No ip found")
@@ -43,7 +34,7 @@ func serveIP(writer http.ResponseWriter, request *http.Request) {
 	}
 }
 
-var ipHeadersInOrder = []string{
+var headersInOrder = []string{
 	"x-client-ip",
 	"cf-connecting-ip",
 	"fastly-client-ip",
@@ -57,46 +48,29 @@ var ipHeadersInOrder = []string{
 	"cf-pseudo-ipv4",
 }
 
-// Stolen from https://github.com/pbojinov/request-ip
 func grabIP(r *http.Request) string {
-
-	if isDebugEnabled {
-		marshalled, err := json.MarshalIndent(r, " ", "  ")
-		if err != nil {
-			log.Println("ERROR: failed to marshal request")
-		}
-		log.Println(string(marshalled))
+	marshalled, err := json.MarshalIndent(r, " ", "  ")
+	if err != nil {
+		log.Println("ERROR: failed to marshal request")
 	}
-
-	if ip := r.Header.Get("x-client-ip"); ip != "" {
-		if isDebugEnabled {
-			log.Println("DEBUG: x-client-ip")
-		}
-		return ip
-	}
+	log.Println(string(marshalled))
 
 	if ip := r.Header.Get("x-forwarded-for"); ip != "" {
 		candidates := strings.Split(ip, ",")
 		if len(candidates) > 0 {
 			ip = strings.TrimSpace(candidates[0])
 		}
-		if isDebugEnabled {
-			log.Println("DEBUG: x-forwarded-for")
-		}
+		log.Printf("Found ip %s in header X-Forwarded-For", ip)
 		return ip
 	}
 
-	for _, headerName := range ipHeadersInOrder {
-		if ip := r.Header.Get(headerName); ip != "" {
-			if isDebugEnabled {
-				log.Println("DEBUG: " + headerName)
-			}
+	for _, header := range headersInOrder {
+		if ip := r.Header.Get(header); ip != "" {
+			log.Printf("Found ip %s in header %s", ip, header)
 			return ip
 		}
 	}
 
-	if isDebugEnabled {
-		log.Println("DEBUG: remote addr")
-	}
+	log.Printf("Fallback to remote header ip %s", r.RemoteAddr)
 	return r.RemoteAddr
 }
