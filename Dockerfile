@@ -3,4 +3,6 @@ FROM golang:latest
 WORKDIR /app
 COPY . /app
 
-RUN go build && ./ip-pls
+RUN go build
+
+CMD ./ip-pls
