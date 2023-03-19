@@ -5,4 +5,4 @@ COPY . /app
 
 RUN go build
 
-CMD ./ip-pls
+CMD ./gossip
