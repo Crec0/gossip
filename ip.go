@@ -24,7 +24,6 @@ func findIP(r *http.Request) string {
 	if ip := r.Header.Get("x-forwarded-for"); ip != "" {
 		candidates := strings.Split(ip, ",")
 		if len(candidates) > 0 {
-			log.Println(candidates) // debug
 			ip = strings.TrimSpace(candidates[0])
 		}
 		log.Printf("Found ip %s in header X-Forwarded-For", ip)

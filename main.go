@@ -11,7 +11,6 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
-	"strings"
 )
 
 func getServicePort() (string, error) {
@@ -32,30 +31,14 @@ func getServicePort() (string, error) {
 
 func requestHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain")
-
-	candidate := findIP(r)
-	if strings.Contains(candidate, ":") {
-		candidate, _, _ = net.SplitHostPort(candidate)
-	}
-
-	ip := net.ParseIP(candidate)
+	ip := net.ParseIP(findIP(r))
 
 	if ip == nil {
 		w.WriteHeader(400)
 		_, _ = fmt.Fprint(w, "No ip found")
 	} else {
-		_, _ = fmt.Fprint(w, ip.To4().String())
+		_, _ = fmt.Fprint(w, ip.String())
 	}
-}
-
-func signalHandler(server *http.Server, signalHandlingChan chan struct{}) {
-	sigint := make(chan os.Signal, 1)
-	signal.Notify(sigint, os.Interrupt)
-	<-sigint
-	if err := server.Shutdown(context.Background()); err != nil {
-		log.Printf("HTTP Server Shutdown Error: %v", err)
-	}
-	close(signalHandlingChan)
 }
 
 func main() {
@@ -71,7 +54,15 @@ func main() {
 	server := &http.Server{Addr: servicePort, Handler: serverMux}
 
 	signalHandlingChan := make(chan struct{})
-	go signalHandler(server, signalHandlingChan)
+	go func() {
+		sigint := make(chan os.Signal, 1)
+		signal.Notify(sigint, os.Interrupt)
+		<-sigint
+		if err := server.Shutdown(context.Background()); err != nil {
+			log.Printf("HTTP Server Shutdown Error: %v", err)
+		}
+		close(signalHandlingChan)
+	}()
 
 	log.Printf("Serving on %s\n", servicePort)
 
