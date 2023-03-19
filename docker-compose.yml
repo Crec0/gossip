@@ -6,8 +6,12 @@ services:
         container_name: ip-pls
         restart: always
 
-        env_file:
-            - ".env"
+        environment:
+            - IP_SERVICE_PORT=10059
+
+#        Or .env
+#        env_file:
+#            -   ".env"
 
         ports:
-            - '10059:10059'
+            - '${IP_SERVICE_PORT}:${IP_SERVICE_PORT}'
