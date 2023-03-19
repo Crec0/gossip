@@ -54,23 +54,21 @@ func main() {
 	serverMux.HandleFunc("/", requestHandler)
 	server := &http.Server{Addr: servicePort, Handler: serverMux}
 
-	signalHandlingChan := make(chan struct{})
 	go func() {
-		sigint := make(chan os.Signal, 1)
-		signal.Notify(sigint, syscall.SIGINT, syscall.SIGTERM, syscall.SIGKILL)
-		<-sigint
-		if err := server.Shutdown(context.Background()); err != nil {
-			log.Printf("HTTP Server Shutdown Error: %v", err)
+		log.Printf("Serving on %s\n", servicePort)
+		if err := server.ListenAndServe(); err != http.ErrServerClosed {
+			log.Fatalf("HTTP server ListenAndServe Error: %v", err)
 		}
-		close(signalHandlingChan)
 	}()
 
-	log.Printf("Serving on %s\n", servicePort)
+	signalHandlerChan := make(chan os.Signal, 1)
+	signal.Notify(signalHandlerChan, syscall.SIGINT, syscall.SIGTERM)
+	<-signalHandlerChan
+	close(signalHandlerChan)
 
-	if err := server.ListenAndServe(); err != http.ErrServerClosed {
-		log.Fatalf("HTTP server ListenAndServe Error: %v", err)
+	if err := server.Shutdown(context.Background()); err != nil {
+		log.Printf("HTTP Server Shutdown Error: %v", err)
 	}
 
-	<-signalHandlingChan
 	log.Printf("Cya!")
 }
