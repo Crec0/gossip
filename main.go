@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"syscall"
 )
 
 func getServicePort() (string, error) {
@@ -56,7 +57,7 @@ func main() {
 	signalHandlingChan := make(chan struct{})
 	go func() {
 		sigint := make(chan os.Signal, 1)
-		signal.Notify(sigint, os.Interrupt)
+		signal.Notify(sigint, syscall.SIGINT, syscall.SIGTERM, syscall.SIGKILL)
 		<-sigint
 		if err := server.Shutdown(context.Background()); err != nil {
 			log.Printf("HTTP Server Shutdown Error: %v", err)
