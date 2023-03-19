@@ -48,7 +48,7 @@ func getServicePort() (string, error) {
 	servicePort, ok := os.LookupEnv("IP_SERVICE_PORT")
 	if !ok {
 		flagPort := flag.Int("port", 10059, "Port where application should serve.")
-		flag.Parsed()
+		flag.Parse()
 		servicePort = strconv.Itoa(*flagPort)
 	}
 
