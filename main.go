@@ -12,7 +12,37 @@ import (
 	"os/signal"
 	"strconv"
 	"syscall"
+	"time"
 )
+
+func main() {
+	log.SetFlags(0)
+
+	servicePort, err := getServicePort()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	server := &http.Server{Addr: servicePort, Handler: http.HandlerFunc(requestHandler)}
+	go func() {
+		log.Printf("Serving on %s\n", servicePort)
+		if err = server.ListenAndServe(); err != http.ErrServerClosed {
+			log.Fatalf("HTTP server ListenAndServe Error: %v", err)
+		}
+	}()
+	defer func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err = server.Shutdown(ctx); err != nil {
+			log.Printf("HTTP Server Shutdown Error: %v", err)
+		}
+	}()
+
+	s := make(chan os.Signal, 1)
+	signal.Notify(s, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
+	<-s
+	log.Printf("Cya!")
+}
 
 func getServicePort() (string, error) {
 	servicePort, ok := os.LookupEnv("IP_SERVICE_PORT")
@@ -40,35 +70,4 @@ func requestHandler(w http.ResponseWriter, r *http.Request) {
 	} else {
 		_, _ = fmt.Fprint(w, ip.String())
 	}
-}
-
-func main() {
-	log.SetFlags(0)
-
-	servicePort, err := getServicePort()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	serverMux := http.NewServeMux()
-	serverMux.HandleFunc("/", requestHandler)
-	server := &http.Server{Addr: servicePort, Handler: serverMux}
-
-	go func() {
-		log.Printf("Serving on %s\n", servicePort)
-		if err := server.ListenAndServe(); err != http.ErrServerClosed {
-			log.Fatalf("HTTP server ListenAndServe Error: %v", err)
-		}
-	}()
-
-	signalHandlerChan := make(chan os.Signal, 1)
-	signal.Notify(signalHandlerChan, syscall.SIGINT, syscall.SIGTERM)
-	<-signalHandlerChan
-	close(signalHandlerChan)
-
-	if err := server.Shutdown(context.Background()); err != nil {
-		log.Printf("HTTP Server Shutdown Error: %v", err)
-	}
-
-	log.Printf("Cya!")
 }
