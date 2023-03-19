@@ -1,9 +1,9 @@
 version: '3'
 
 services:
-    ip-pls:
+    gossip:
         build: .
-        container_name: ip-pls
+        container_name: gossip
         restart: always
 
         environment:
