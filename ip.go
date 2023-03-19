@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"net"
 	"net/http"
 	"strings"
 )
@@ -38,5 +39,9 @@ func findIP(r *http.Request) string {
 	}
 
 	log.Printf("Fallback to remote header ip %s", r.RemoteAddr)
+	if strings.Contains(r.RemoteAddr, ":") {
+		ip, _, _ := net.SplitHostPort(r.RemoteAddr)
+		return ip
+	}
 	return r.RemoteAddr
 }
