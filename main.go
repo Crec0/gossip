@@ -1,69 +1,84 @@
 package main
 
 import (
+	"context"
+	"errors"
+	"flag"
 	"fmt"
 	"log"
 	"net"
 	"net/http"
 	"os"
+	"os/signal"
+	"strconv"
 	"strings"
 )
 
-func main() {
-	portToServe, ok := os.LookupEnv("IP_SERVICE_PORT")
+func getServicePort() (string, error) {
+	servicePort, ok := os.LookupEnv("IP_SERVICE_PORT")
 	if !ok {
-		portToServe = "10059"
+		flagPort := flag.Int("port", 10059, "Port where application should serve.")
+		flag.Parsed()
+		servicePort = strconv.Itoa(*flagPort)
 	}
-	log.Printf("Serving on %s\n", portToServe)
-	log.Fatal(http.ListenAndServe(":"+portToServe, http.HandlerFunc(serveIP)))
+
+	numericPort, _ := strconv.Atoi(servicePort)
+	if 0 <= numericPort && numericPort <= 65536 {
+		return ":" + servicePort, nil
+	}
+
+	return "", errors.New("port must be greater than 0 and less than or equal to 65536. provided: " + servicePort)
 }
 
-func serveIP(writer http.ResponseWriter, request *http.Request) {
-	candidate := grabIP(request)
+func requestHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/plain")
+
+	candidate := findIP(r)
 	if strings.Contains(candidate, ":") {
 		candidate, _, _ = net.SplitHostPort(candidate)
 	}
+
 	ip := net.ParseIP(candidate)
 
 	if ip == nil {
-		writer.WriteHeader(400)
-		_, _ = fmt.Fprint(writer, "No ip found")
+		w.WriteHeader(400)
+		_, _ = fmt.Fprint(w, "No ip found")
 	} else {
-		_, _ = fmt.Fprint(writer, ip.To4().String())
+		_, _ = fmt.Fprint(w, ip.To4().String())
 	}
 }
 
-var headersInOrder = []string{
-	"x-client-ip",
-	"cf-connecting-ip",
-	"fastly-client-ip",
-	"true-client-ip",
-	"x-real-ip",
-	"x-cluster-client-ip",
-	"x-forwarded",
-	"forwarded-for",
-	"forwarded",
-	"x-appengine-user-ip",
-	"cf-pseudo-ipv4",
+func signalHandler(server *http.Server, signalHandlingChan chan struct{}) {
+	sigint := make(chan os.Signal, 1)
+	signal.Notify(sigint, os.Interrupt)
+	<-sigint
+	if err := server.Shutdown(context.Background()); err != nil {
+		log.Printf("HTTP Server Shutdown Error: %v", err)
+	}
+	close(signalHandlingChan)
 }
 
-func grabIP(r *http.Request) string {
-	if ip := r.Header.Get("x-forwarded-for"); ip != "" {
-		candidates := strings.Split(ip, ",")
-		if len(candidates) > 0 {
-			ip = strings.TrimSpace(candidates[0])
-		}
-		log.Printf("Found ip %s in header X-Forwarded-For", ip)
-		return ip
+func main() {
+	log.SetFlags(0)
+
+	servicePort, err := getServicePort()
+	if err != nil {
+		log.Fatal(err)
 	}
 
-	for _, header := range headersInOrder {
-		if ip := r.Header.Get(header); ip != "" {
-			log.Printf("Found ip %s in header %s", ip, header)
-			return ip
-		}
+	serverMux := http.NewServeMux()
+	serverMux.HandleFunc("/", requestHandler)
+	server := &http.Server{Addr: servicePort, Handler: serverMux}
+
+	signalHandlingChan := make(chan struct{})
+	go signalHandler(server, signalHandlingChan)
+
+	log.Printf("Serving on %s\n", servicePort)
+
+	if err := server.ListenAndServe(); err != http.ErrServerClosed {
+		log.Fatalf("HTTP server ListenAndServe Error: %v", err)
 	}
 
-	log.Printf("Fallback to remote header ip %s", r.RemoteAddr)
-	return r.RemoteAddr
+	<-signalHandlingChan
+	log.Printf("Cya!")
 }
